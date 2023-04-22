@@ -60,12 +60,17 @@ cv2.imwrite('distTransformed.jpg', dist)
 binary = dist.astype('uint8')
 
 # Find contours in the binary image
-contours = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+contours = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
 # Iterate through contours and calculate x and y distances
 for contour in contours:
     # Calculate the centroid of the contour
     M = cv2.moments(contour)
+
+    # Skip the contour if the area is zero (i.e., M["m00"] == 0)
+    if M["m00"] == 0:
+        continue
+
     cX = int(M["m10"] / M["m00"])
     cY = int(M["m01"] / M["m00"])
 
