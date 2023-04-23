@@ -55,7 +55,7 @@ for img_index in range(len(img_list)):
     # dilated_image = cv2.dilate(binary_image, kernel, iterations=20)
     closed_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel, iterations=20)
 
-    cv2.imwrite('output/' + img_list[img_index], closed_image)
+    cv2.imwrite('mask/' + img_list[img_index], closed_image)
 
     # cv2.imshow('Dilated Image', closed_image)
     # cv2.waitKey(0)

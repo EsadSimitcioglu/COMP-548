@@ -58,20 +58,22 @@ class Stack:
         return len(self.items)
 
 
-def region_growing(seeds, image, mask, threshold):
-    segmentation_map = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-
-    seeds.reverse()
-
+def region_growing(seed, image, mask, threshold, segmentation_map, seed_counter):
     # Create a stack for region growing
     stack = Stack()
-    for seed in seeds:
-        stack.push(seed)
+
+    stack.push(seed)
 
     # Define 8-connected neighborhood
     neighbors = [(0, -1), (0, 1), (-1, 0), (1, 0)]
 
-    seed_counter = 0
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    best_threshold = 185
+
+    binary_image = cv2.threshold(rgb_image, best_threshold, 255, cv2.THRESH_BINARY)[1]
+    opened_binary_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel, iterations=1)
+    cells = cv2.bitwise_not(opened_binary_image, mask=mask_image)
+    eroded_cells = cv2.erode(cells, kernel, iterations=1)
 
     # Iterate over queue
     while stack.size() > 0:
@@ -79,11 +81,7 @@ def region_growing(seeds, image, mask, threshold):
         # Get the first element from the queue
         x, y = stack.pop()
 
-        if (x, y) in seeds:
-            seed = (x, y)
-            seed_counter += 1
-
-        if (y < 768 and x < 1024) and mask[y, x] != 0 and segmentation_map[y, x] == 0:
+        if (y < 768 and x < 1024) and mask[y, x] != 0 and eroded_cells[y, x] != 0 and segmentation_map[y, x] == 0:
             intensity_difference = abs(int(image[y, x]) - int(image[seed[1], seed[0]]))
 
             if intensity_difference <= threshold:
@@ -95,41 +93,36 @@ def region_growing(seeds, image, mask, threshold):
                     nx = x + neighbor[0]
                     ny = y + neighbor[1]
 
-                    if (ny < 768 and nx < 1024) and mask[ny, nx] != 0 and segmentation_map[ny, nx] == 0:
+                    if (ny < 768 and nx < 1024) and mask[ny, nx] != 0 and eroded_cells[y, x] != 0 and segmentation_map[
+                        ny, nx] == 0:
                         stack.push((nx, ny))
 
     return segmentation_map
 
-    # Region growing loop
-
 
 image_list = ['im1.jpg', 'im2.jpg', 'im3.jpg']
 mask_image_list = ['im1_gold_mask.txt', 'im2_gold_mask.txt', 'im3_gold_mask.txt']
+
 
 for img_index in range(len(image_list)):
     # Load the grayscale image
     rgb_image = cv2.imread('data/' + image_list[img_index], cv2.IMREAD_GRAYSCALE)
 
     # Load the text data into a NumPy array
-    mask_image = cv2.imread('output/' + image_list[img_index], cv2.IMREAD_GRAYSCALE)
-
-    # mask_image[mask_image == 255] = 1
+    mask_image = cv2.imread('mask/' + image_list[img_index], cv2.IMREAD_GRAYSCALE)
 
     # Find the cell locations
     cell_locations = find_cell_locations(rgb_image, mask_image)
-    segmentation_map = region_growing(cell_locations, rgb_image, mask_image, 20)
+
+    segmentation_map = np.zeros((rgb_image.shape[0], rgb_image.shape[1]), dtype=np.uint8)
+    seed_counter = 1
+    for cell in cell_locations:
+        segmentation_map = region_growing(cell, rgb_image, mask_image, 20, segmentation_map, seed_counter)
+        seed_counter += 1
 
     colored = np.zeros((rgb_image.shape[0], rgb_image.shape[1], 3), 'uint8')
     colors = np.random.randint(0, 256, size=(len(cell_locations), 3))
     for i in range(len(cell_locations)):
         colored[segmentation_map == i + 1] = colors[i, :]
 
-    cv2.imwrite('deneme/' + image_list[img_index], colored)
-
-    # Draw the cell locations
-    """
-    for cell_location in cell_locations:
-        cv2.circle(mask_image, cell_location, 5, (0, 0, 255), -1)
-
-    cv2.imwrite('deneme/' + image_list[img_index], mask_image)
-    """
+    cv2.imwrite('colored_cell/' + image_list[img_index], colored)
