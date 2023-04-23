@@ -80,7 +80,7 @@ def region_growing(seed, image, mask, threshold, segmentation_map, seed_counter)
 
         # Get the first element from the queue
         x, y = stack.pop()
-
+        print(x, y)
         if (y < 768 and x < 1024) and mask[y, x] != 0 and eroded_cells[y, x] != 0 and segmentation_map[y, x] == 0:
             intensity_difference = abs(int(image[y, x]) - int(image[seed[1], seed[0]]))
 

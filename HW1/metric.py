@@ -40,8 +40,8 @@ def cell_level(ground_truth, centroidList):
                 cellNumList.append(ground_truth[x][y])
     cellNumCopy = deepcopy(cellNumList)
 
-    for centroid in centroidList:
-        ground_truth_val = ground_truth[centroid['x']][centroid['y']]
+    for y, x in centroidList:
+        ground_truth_val = ground_truth[x][y]
         if ground_truth_val in cellNumList:
             tp += 1
             cellNumList.remove(ground_truth_val)
@@ -50,11 +50,10 @@ def cell_level(ground_truth, centroidList):
 
     cellNumList = deepcopy(cellNumCopy)
     for cellNum in cellNumList:
-        l = [c for c in centroidList if ground_truth[c['x']][c['y']] == cellNum]
+        l = [c for c in centroidList if ground_truth[c[1]][c[0]] == cellNum]
 
         if len(l) != 1:
             fn += 1
-    print(tp, fp, fn)
 
     precision = tp / (tp + fp)
     recall = tp / (tp + fn)

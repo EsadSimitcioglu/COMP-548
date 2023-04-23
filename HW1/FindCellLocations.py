@@ -71,8 +71,7 @@ def find_cell_locations(rgb_image, mask_image):
 
         cX = int(M["m10"] / M["m00"])
         cY = int(M["m01"] / M["m00"])
-        point = {'y': cX, 'x': cY}
-        centroidList.append(point)
+        centroidList.append((cX, cY))
 
         # print("Contour Centroid: ({}, {})".format(cX, cY))
         # print("---------------------")
@@ -84,9 +83,9 @@ def find_cell_locations(rgb_image, mask_image):
 
     return centroidList
 
-rgb_image = cv2.imread('data/im1.jpg', cv2.IMREAD_GRAYSCALE)
-mask_image = cv2.imread('mask/im1.jpg', cv2.IMREAD_GRAYSCALE)
-centroidList = find_cell_locations(rgb_image, mask_image)
-ground_truth = np.loadtxt('data/im1_gold_cells.txt')
-
-print(cell_level(ground_truth, centroidList))
+for i in range(1,4):
+    rgb_image = cv2.imread('data/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
+    mask_image = cv2.imread('mask/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
+    centroidList = find_cell_locations(rgb_image, mask_image)
+    ground_truth = np.loadtxt('data/im{}_gold_cells.txt'.format(i))
+    print(cell_level(ground_truth, centroidList))
