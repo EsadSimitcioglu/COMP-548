@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from FindCellLocations import find_cell_locations
 
+from metric import intersection_over_union
+
 
 class Stack:
     def __init__(self):
@@ -80,7 +82,6 @@ def region_growing(seed, image, mask, threshold, segmentation_map, seed_counter)
 
         # Get the first element from the queue
         x, y = stack.pop()
-        print(x, y)
         if (y < 768 and x < 1024) and mask[y, x] != 0 and eroded_cells[y, x] != 0 and segmentation_map[y, x] == 0:
             intensity_difference = abs(int(image[y, x]) - int(image[seed[1], seed[0]]))
 
@@ -102,6 +103,9 @@ def region_growing(seed, image, mask, threshold, segmentation_map, seed_counter)
 
 image_list = ['im1.jpg', 'im2.jpg', 'im3.jpg']
 mask_image_list = ['im1_gold_mask.txt', 'im2_gold_mask.txt', 'im3_gold_mask.txt']
+ground_truth_list = ['im1_gold_cells.txt', 'im2_gold_cells.txt', 'im3_gold_cells.txt']
+threshold_list = [0.5, 0.75, 0.9]
+
 
 
 for img_index in range(len(image_list)):
@@ -111,10 +115,13 @@ for img_index in range(len(image_list)):
     # Load the text data into a NumPy array
     mask_image = cv2.imread('mask/' + image_list[img_index], cv2.IMREAD_GRAYSCALE)
 
+    # Load the text data into a NumPy array
+    ground_truth = np.loadtxt('data/' + image_list[img_index][:-4] + '_gold_cells.txt', dtype=np.uint8)
+
     # Find the cell locations
     cell_locations = find_cell_locations(rgb_image, mask_image)
 
-    segmentation_map = np.zeros((rgb_image.shape[0], rgb_image.shape[1]), dtype=np.uint8)
+    segmentation_map = np.zeros((rgb_image.shape[0], rgb_image.shape[1]), dtype=np.int32)
     seed_counter = 1
     for cell in cell_locations:
         segmentation_map = region_growing(cell, rgb_image, mask_image, 20, segmentation_map, seed_counter)
@@ -126,3 +133,13 @@ for img_index in range(len(image_list)):
         colored[segmentation_map == i + 1] = colors[i, :]
 
     cv2.imwrite('colored_cell/' + image_list[img_index], colored)
+
+    precision, recall, f_score = intersection_over_union(segmentation_map, ground_truth, threshold_list[img_index])
+
+    print("Precision:" + str(precision))
+    print("Recall: " + str(recall))
+    print("F-Score: " + str(f_score))
+
+    print("***********************")
+
+
