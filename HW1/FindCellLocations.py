@@ -1,6 +1,10 @@
+import copy
+
 import cv2
+import imutils as imutils
 import numpy as np
 
+from metric import pixel_level, cell_level
 
 def otsu_method(rgb_image):
     # Calculate histogram
@@ -56,36 +60,33 @@ def find_cell_locations(rgb_image, mask_image):
     # Find contours in the binary image
     contours = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
-    contours_center_list = []
-
+    centroidList = []
     # Iterate through contours and calculate x and y distances
     for contour in contours:
         # Calculate the centroid of the contour
         M = cv2.moments(contour)
-
         # Skip the contour if the area is zero (i.e., M["m00"] == 0)
         if M["m00"] == 0:
             continue
 
         cX = int(M["m10"] / M["m00"])
         cY = int(M["m01"] / M["m00"])
+        point = {'y': cX, 'x': cY}
+        centroidList.append(point)
 
-        # Calculate the x and y distances from the centroid to the image center
-        center_x = rgb_image.shape[1] // 2
-        center_y = rgb_image.shape[0] // 2
-        x_distance = cX - center_x
-        y_distance = cY - center_y
+        # print("Contour Centroid: ({}, {})".format(cX, cY))
+        # print("---------------------")
 
-        contours_center_list.append((cX, cY))
+    # cv2.imshow('Eroded Cells', eroded_cells)
+    # cv2.imshow('Dist', dist)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
-        print("Contour Centroid: ({}, {})".format(cX, cY))
-        print("X Distance from Center: {}".format(x_distance))
-        print("Y Distance from Center: {}".format(y_distance))
-        print("---------------------")
+    return centroidList
 
-    #cv2.imshow('Eroded Cells', eroded_cells)
-    #cv2.imshow('Dist', dist)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+rgb_image = cv2.imread('data/im1.jpg', cv2.IMREAD_GRAYSCALE)
+mask_image = cv2.imread('mask/im1.jpg', cv2.IMREAD_GRAYSCALE)
+centroidList = find_cell_locations(rgb_image, mask_image)
+ground_truth = np.loadtxt('data/im1_gold_cells.txt')
 
-    return contours_center_list
+print(cell_level(ground_truth, centroidList))
