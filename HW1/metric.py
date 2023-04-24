@@ -23,9 +23,9 @@ def pixel_level(ground_truth_image, test_image):
             elif ground_truth_value == 1 and test_value == 0:
                 fn += 1
 
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-    f_score = 2 * ((precision * recall) / (precision + recall))
+    precision = tp / (tp + fp + 1e-7)
+    recall = tp / (tp + fn + 1e-7)
+    f_score = 2 * ((precision * recall) / (precision + recall  + 1e-7))
 
     return precision, recall, f_score
 
@@ -66,8 +66,6 @@ def cell_level(ground_truth, centroidList):
 
 def intersection_over_union(segmented_image, ground_truth, threshold):
     tp = 0
-    fp = 0
-    fn = 0
 
     cellNumList = []
     for x in range(768):
@@ -114,15 +112,42 @@ def intersection_over_union(segmented_image, ground_truth, threshold):
     number_of_ground_truth_cells = len(cellNumList)
     number_of_segmented_cells = len(np.unique(segmented_image)) - 1
 
-    fn += number_of_ground_truth_cells - tp
-    fp += number_of_segmented_cells - tp
+    fn = number_of_ground_truth_cells - tp
+    fp = number_of_segmented_cells - tp
 
     print("tp: ", tp)
     print("fp: ", fp)
     print("fn: ", fn)
 
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-    f_score = 2 * ((precision * recall) / (precision + recall))
+    precision = tp / (tp + fp + 1e-7)
+    recall = tp / (tp + fn + 1e-7)
+    f_score = 2 * ((precision * recall) / (precision + recall + 1e-7))
 
     return precision, recall, f_score
+
+
+def maximal_overlap(src, dst, cur):
+    maximal, index = 0, 0
+    for i in range(1, np.max(src) + 1):
+        cur_sum = np.sum(np.logical_and(src == i, dst == cur))
+        if maximal < cur_sum:
+            maximal, index = cur_sum, i
+    di = 2 * maximal / (np.sum(src == index) + np.sum(dst == cur))
+    return index, di
+
+
+def dice_index(ground_truth, found):
+    res = 0
+
+    whole_found = np.sum(found != 0)
+    whole_ground = np.sum(ground_truth != 0)
+
+    for i in range(1, np.max(found) + 1):
+        grnd_i, di = maximal_overlap(ground_truth, found, i)
+        res += di * (np.sum(found == i) / whole_found)
+
+    for i in range(1, np.max(ground_truth) + 1):
+        found_i, di = maximal_overlap(found, ground_truth, i)
+        res += di * (np.sum(ground_truth == i) / whole_ground)
+
+    return res / 2

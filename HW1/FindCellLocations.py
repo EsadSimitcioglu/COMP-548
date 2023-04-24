@@ -6,6 +6,7 @@ import numpy as np
 
 from metric import pixel_level, cell_level
 
+
 def otsu_method(rgb_image):
     # Calculate histogram
     histogram = cv2.calcHist([rgb_image], [0], None, [256], [0, 256])
@@ -49,11 +50,21 @@ def find_cell_locations(rgb_image, mask_image):
     binary_image = cv2.threshold(rgb_image, best_threshold, 255, cv2.THRESH_BINARY)[1]
     opened_binary_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel, iterations=1)
     cells = cv2.bitwise_not(opened_binary_image, mask=mask_image)
+    cells = cv2.threshold(cells, best_threshold, 255, cv2.THRESH_BINARY)[1]
     eroded_cells = cv2.erode(cells, kernel, iterations=1)
 
     dist = cv2.distanceTransform(eroded_cells, cv2.DIST_L2, 3)
     cv2.normalize(dist, dist, 0, 255, cv2.NORM_MINMAX)
-    cv2.imwrite('distTransformed.jpg', dist)
+
+    # dilation
+    dist = cv2.morphologyEx(dist, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    # Apply median filter to remove noise
+    ksize = 5  # Kernel size for median filter
+    dist = cv2.medianBlur(dist, ksize)
+
+    # do dilation
+    dist = cv2.morphologyEx(dist, cv2.MORPH_CLOSE, kernel, iterations=2)
 
     binary = dist.astype('uint8')
 
@@ -76,14 +87,15 @@ def find_cell_locations(rgb_image, mask_image):
         # print("Contour Centroid: ({}, {})".format(cX, cY))
         # print("---------------------")
 
-    # cv2.imshow('Eroded Cells', eroded_cells)
-    # cv2.imshow('Dist', dist)
+
+    # cv2.imshow('Binary', dist)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
     return centroidList
 
-for i in range(1,4):
+
+for i in range(1, 4):
     rgb_image = cv2.imread('data/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
     mask_image = cv2.imread('mask/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
     centroidList = find_cell_locations(rgb_image, mask_image)

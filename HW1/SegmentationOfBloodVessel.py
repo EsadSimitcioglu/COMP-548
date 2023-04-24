@@ -2,20 +2,23 @@ import cv2
 import numpy as np
 from metric import pixel_level
 
+
 img_list = ['d4_h.jpg', 'd7_dr.jpg', 'd11_g.jpg']
 ground_truth_list = ['d4_h_gold.png', 'd7_dr_gold.png', 'd11_g_gold.png']
 
 for img_index in range(len(img_list)):
 
     # Load the grayscale image
-    img = cv2.imread('fundus/' + img_list[img_index], cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread('fundus/' + img_list[img_index])
+
+    # Convert to grayscale
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Load the text data into a NumPy array
     ground_truth = cv2.imread('fundus/' + ground_truth_list[img_index], cv2.IMREAD_GRAYSCALE)
 
-
     # Apply Gaussian blur to the image
-    img_blur = cv2.GaussianBlur(img, (5, 5), 0)
+    img_blur = cv2.GaussianBlur(img_gray, (5, 5), 0)
 
     # Apply the LoG filter
     img_log = cv2.Laplacian(img_blur, cv2.CV_64F, ksize=5)
@@ -28,9 +31,6 @@ for img_index in range(len(img_list)):
 
     # Apply threshold to convert the image into binary
     ret, thresh = cv2.threshold(img_log, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    # Define the kernel for erosion and opening
-    kernel = np.ones((3, 3), np.uint8)  # You can adjust the size of the kernel as needed
 
     # find contours and discard contours with small areas
     mask = np.zeros_like(thresh)
@@ -45,32 +45,27 @@ for img_index in range(len(img_list)):
 
     # apply mask to thresh
     result1 = cv2.bitwise_and(thresh, mask)
-    mask = cv2.merge([mask,mask,mask])
-    #result2 = cv2.bitwise_and(img, mask)
+    mask = cv2.merge([mask, mask, mask])
+    result2 = cv2.bitwise_and(img, mask)
 
-    # do binary dilate
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    close = cv2.morphologyEx(result1, cv2.MORPH_CLOSE, kernel, iterations=5)
-    dilate = cv2.dilate(result1, kernel, iterations=3)
+    # convert result2 image to binary image
+    result2 = cv2.cvtColor(result2, cv2.COLOR_BGR2GRAY)
+    result2 = cv2.threshold(result2, 0, 255, cv2.THRESH_BINARY)[1]
 
-    dilate[dilate == 255] = 1
+    # Apply median filter to remove noise
+    ksize = 5  # Kernel size for median filter
+    result = cv2.medianBlur(result2, ksize)
 
-    precision, recall, f_score = pixel_level(ground_truth, dilate)
+    cv2.imshow('Dilated Image', result)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    result[result == 255] = 1
+
+    precision, recall, f_score = pixel_level(ground_truth, result)
 
     print("Precision:" + str(precision))
     print("Recall: " + str(recall))
     print("F-Score: " + str(f_score))
 
     print("***********************")
-
-    dilate[dilate == 1] = 255
-    ground_truth[ground_truth == 1] = 255
-
-
-    # cv2.imshow('Image', ground_truth)
-    # cv2.imshow('Dilated Image', dilate)
-    # cv2.imshow('Close', close)
-    # cv2.imshow('Img Log', thresh)
-
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
