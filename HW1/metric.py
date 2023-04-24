@@ -132,22 +132,22 @@ def maximal_overlap(src, dst, cur):
         cur_sum = np.sum(np.logical_and(src == i, dst == cur))
         if maximal < cur_sum:
             maximal, index = cur_sum, i
-    di = 2 * maximal / (np.sum(src == index) + np.sum(dst == cur))
-    return index, di
+    DI = 2 * maximal / (np.sum(src == index) + np.sum(dst == cur))
+    return index, DI
 
 
-def dice_index(ground_truth, found):
+def dice_index(ground_truth, segmented_image):
     res = 0
 
-    whole_found = np.sum(found != 0)
-    whole_ground = np.sum(ground_truth != 0)
+    segm_sum = np.sum(segmented_image != 0)
+    ground_sum = np.sum(ground_truth != 0)
 
-    for i in range(1, np.max(found) + 1):
-        grnd_i, di = maximal_overlap(ground_truth, found, i)
-        res += di * (np.sum(found == i) / whole_found)
+    for i in range(1, np.max(segmented_image) + 1):
+        ground_index, DI = maximal_overlap(ground_truth, segmented_image, i)
+        res += DI * (np.sum(segmented_image == i) / segm_sum)
 
     for i in range(1, np.max(ground_truth) + 1):
-        found_i, di = maximal_overlap(found, ground_truth, i)
-        res += di * (np.sum(ground_truth == i) / whole_ground)
+        image_index, DI = maximal_overlap(segmented_image, ground_truth, i)
+        res += DI * (np.sum(ground_truth == i) / ground_sum)
 
     return res / 2
