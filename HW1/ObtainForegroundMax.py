@@ -1,17 +1,21 @@
 import cv2
 import numpy as np
 
-from metric import pixel_level
+from HW1.metric import pixel_level
 
+# List of input image filenames
 img_list = ['im1.jpg', 'im2.jpg', 'im3.jpg']
+
+# List of ground truth mask filenames
 ground_truth_list = ['im1_gold_mask.txt', 'im2_gold_mask.txt', 'im3_gold_mask.txt']
 
+# Loop through each image
 for img_index in range(len(img_list)):
 
     # Load the grayscale image
     test_image = cv2.imread('data/' + img_list[img_index], cv2.IMREAD_GRAYSCALE)
 
-    # Load the text data into a NumPy array
+    # Load the ground truth mask data into a NumPy array
     ground_truth = np.loadtxt('data/' + ground_truth_list[img_index])
 
     # Calculate histogram
@@ -23,11 +27,11 @@ for img_index in range(len(img_list)):
     # Compute the cumulative distribution function (CDF)
     cdf = histogram_norm.cumsum()
 
-    # Initialize variables
+    # Initialize variables for best threshold and intra-class variance
     best_threshold = 0
     best_intra_class_variance = 0
 
-    # Iterate over all possible threshold values
+    # Iterate over all possible threshold values (0-255)
     for t in range(256):
         # Background and foreground class probabilities
         prob_background = cdf[t]
@@ -46,26 +50,26 @@ for img_index in range(len(img_list)):
             best_intra_class_variance = intra_class_variance
             best_threshold = t
 
-    edges = cv2.Canny(test_image, 100, 200)  # You can adjust the thresholds as needed
-
+    # Threshold the image using the best threshold value
     binary_image = cv2.threshold(test_image, best_threshold, 255, cv2.THRESH_BINARY)[1]
 
+    # Define a structuring element for morphological operations
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
-    # dilated_image = cv2.dilate(binary_image, kernel, iterations=20)
+    # Apply morphological closing operation to fill gaps in the binary image
     closed_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel, iterations=20)
 
+    # Save the resulting closed image as the mask
     cv2.imwrite('mask/' + img_list[img_index], closed_image)
 
-    # cv2.imshow('Dilated Image', closed_image)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-
+    # Convert the closed image to a binary mask (0 or 1)
     closed_image[closed_image == 255] = 1
 
+    # Compute precision, recall, and F-score using the ground truth mask
     precision, recall, f_score = pixel_level(ground_truth, closed_image)
 
-    print("Precision:" + str(precision))
+    # Print the evaluation metrics
+    print("Precision: " + str(precision))
     print("Recall: " + str(recall))
     print("F-Score: " + str(f_score))
 

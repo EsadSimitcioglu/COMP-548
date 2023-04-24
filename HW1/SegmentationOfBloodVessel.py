@@ -73,16 +73,22 @@ for img_index in range(len(img_list)):
     dist = cv2.distanceTransform(result2, cv2.DIST_L2, 3)
     cv2.normalize(dist, dist, 0, 255, cv2.NORM_MINMAX)
 
+    dist = cv2.threshold(dist, 0, 255, cv2.THRESH_BINARY)[1]
+
     # Apply median filter to remove noise
     ksize = 5  # Kernel size for median filter
     dist = cv2.medianBlur(dist, ksize)
 
     # do erosion
-    dist = cv2.erode(dist, kernel, iterations=1)
+    result2 = cv2.erode(dist, kernel, iterations=1)
 
-    cv2.imshow('Dilated Image', dist)
+
+
+    cv2.imshow('Dilated Image', result2)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    cv2.imwrite('blood_vessel/' + img_list[img_index], result2)
 
     result2[result2 == 255] = 1
 

@@ -1,10 +1,8 @@
-import copy
 
 import cv2
-import imutils as imutils
 import numpy as np
 
-from metric import pixel_level, cell_level
+from metric import cell_level
 
 
 def otsu_method(rgb_image):
@@ -43,7 +41,7 @@ def otsu_method(rgb_image):
     return best_threshold
 
 
-def find_cell_locations(rgb_image, mask_image):
+def find_cell_locations(rgb_image, mask_image, i):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     best_threshold = otsu_method(rgb_image)
 
@@ -55,6 +53,9 @@ def find_cell_locations(rgb_image, mask_image):
 
     dist = cv2.distanceTransform(eroded_cells, cv2.DIST_L2, 3)
     cv2.normalize(dist, dist, 0, 255, cv2.NORM_MINMAX)
+
+    # save distance transform image
+    cv2.imwrite('distance_transform/im{}.jpg'.format(i), dist)
 
     # dilation
     dist = cv2.morphologyEx(dist, cv2.MORPH_CLOSE, kernel, iterations=2)
@@ -84,9 +85,6 @@ def find_cell_locations(rgb_image, mask_image):
         cY = int(M["m01"] / M["m00"])
         centroidList.append((cX, cY))
 
-        # print("Contour Centroid: ({}, {})".format(cX, cY))
-        # print("---------------------")
-
 
     # cv2.imshow('Binary', dist)
     # cv2.waitKey(0)
@@ -98,6 +96,6 @@ def find_cell_locations(rgb_image, mask_image):
 for i in range(1, 4):
     rgb_image = cv2.imread('data/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
     mask_image = cv2.imread('mask/im{}.jpg'.format(i), cv2.IMREAD_GRAYSCALE)
-    centroidList = find_cell_locations(rgb_image, mask_image)
+    centroidList = find_cell_locations(rgb_image, mask_image, i)
     ground_truth = np.loadtxt('data/im{}_gold_cells.txt'.format(i))
     print(cell_level(ground_truth, centroidList))

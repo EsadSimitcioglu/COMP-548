@@ -136,7 +136,7 @@ for img_index in range(len(image_list)):
     ground_truth = np.loadtxt('data/' + ground_truth_list[img_index], dtype=np.uint32)
 
     # Find the cell locations
-    cell_locations = find_cell_locations(rgb_image, mask_image)
+    cell_locations = find_cell_locations(rgb_image, mask_image, img_index)
 
     segmentation_map = np.zeros((rgb_image.shape[0], rgb_image.shape[1]), dtype=np.int32)
     seed_counter = 1
@@ -152,6 +152,7 @@ for img_index in range(len(image_list)):
     cv2.imwrite('colored_cell/' + image_list[img_index], colored)
 
     """
+                                                            
     for threshold in threshold_list:
         precision, recall, f_score = intersection_over_union(segmentation_map, ground_truth, threshold)
         print("***********************")
@@ -159,8 +160,7 @@ for img_index in range(len(image_list)):
         print("Recall: " + str(recall))
         print("F-Score: " + str(f_score))
         print("***********************")
-    """
+        """
 
     dice_metric = dice_index(segmentation_map, ground_truth)
-
     print("Dice Metric: " + str(dice_metric))
