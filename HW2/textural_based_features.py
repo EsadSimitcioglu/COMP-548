@@ -2,26 +2,41 @@ import numpy as np
 
 
 def calculateCooccurrenceMatrix(patch, binNumber, di, dj):
-    # Calculate histogram
-    hist, _ = np.histogram(patch, bins=binNumber, range=(0, 255))
+    # Get the shape of the patch
+    patch_shape = patch.shape
 
-    # Create co-occurrence matrix
-    M = np.zeros((binNumber, binNumber), dtype=np.uint32)
+    # Create an empty co-occurrence matrix
+    M = np.zeros((binNumber, binNumber))
 
-    # Calculate co-occurrence matrix
-    height, width = patch.shape
-    for y in range(height):
-        for x in range(width):
-            i = patch[y, x]
+    # Calculate the maximum gray-level value in the patch
+    max_gray_level = np.max(patch) + 1
 
-            # Calculate neighboring pixel coordinates
-            ny = y + di
-            nx = x + dj
+    # Calculate the size of each bin
+    bin_size = max_gray_level / binNumber
 
-            # Check if neighboring pixel is within bounds
-            if ny >= 0 and ny < height and nx >= 0 and nx < width:
-                j = patch[ny, nx]
-                M[i, j] += 1
+    # Iterate over each pixel in the patch
+    for i in range(patch_shape[0]):
+        for j in range(patch_shape[1]):
+            # Calculate the current gray-level value
+            current_gray_level = patch[i, j]
+
+            # Calculate the bin index for the current pixel
+            bin_index = int(current_gray_level // bin_size)
+
+            # Calculate the neighboring pixel coordinates
+            neighbor_i = i + di
+            neighbor_j = j + dj
+
+            # Check if the neighboring pixel is within the patch boundaries
+            if neighbor_i >= 0 and neighbor_i < patch_shape[0] and neighbor_j >= 0 and neighbor_j < patch_shape[1]:
+                # Calculate the neighboring gray-level value
+                neighbor_gray_level = patch[neighbor_i, neighbor_j]
+
+                # Calculate the bin index for the neighboring pixel
+                neighbor_bin_index = int(neighbor_gray_level // bin_size)
+
+                # Increment the co-occurrence count in the matrix
+                M[bin_index, neighbor_bin_index] += 1
 
     return M
 
@@ -31,7 +46,7 @@ def calculateAccumulatedCooccurrenceMatrix(patch, binNumber, d):
     # Given Distance List
     distance_list = [(d, 0), (d, d), (0, d), (-d, d), (-d, 0), (-d, -d), (0, -d), (d, -d)]
 
-    sum_of_calculated_matrices = []
+    sum_of_calculated_matrices = np.array([[0] * binNumber] * binNumber)
 
     for distance in distance_list:
         M = calculateCooccurrenceMatrix(patch, binNumber, distance[0], distance[1])
@@ -56,4 +71,4 @@ def calculateCooccurrenceFeatures(accM):
     # Entropy
     entropy = -np.sum(accM * np.log2(accM + 1e-10))
 
-    return asm, max_prob, idm, entropy
+    return np.array([asm, max_prob, idm, entropy])

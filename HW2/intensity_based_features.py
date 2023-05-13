@@ -16,7 +16,6 @@ def calculateIntensityFeatures(patch, binNumber):
     # Calculate entropy
     entropy = -np.sum(probabilities * np.log2(probabilities + 1e-10))
 
-    print(average, std_dev, entropy)
-
     # Return intensity features
-    return average, std_dev, entropy
+    return np.array([average, std_dev, entropy])
+
