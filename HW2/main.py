@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 
-from HW2.intensity_based_features import calculateIntensityFeatures
-from HW2.textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
-
+from intensity_based_features import calculateIntensityFeatures
+from textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
+import itertools
 
 def create_cell_dict(cell_locations):
     class_dict = {}
@@ -57,57 +57,83 @@ def displayPatch(patch):
     cv2.destroyAllWindows()
 
 
-img = cv2.imread('nucleus-dataset/test_1.png', cv2.IMREAD_GRAYSCALE)
-cell_locations = pd.read_csv('nucleus-dataset/test_1_cells', sep='\t', header=None)
+def experiment(bin_number, d, N, k):
 
-cell_dict = create_cell_dict(cell_locations)
+    cluster_ratio_list = []
+    test_nums = [1, 10]
+    for testNum in test_nums:
 
-print(cell_dict)
+        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE) # read it in main func
+        cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
 
-d = 1
-bin_number = 10
+        cell_dict = create_cell_dict(cell_locations)
 
-all_features = np.array([]).reshape(0, 7)
+        all_features = np.array([]).reshape(0, 7)
 
-for location in cell_locations.values:
-    patch = cropPatch(img, (location[0], location[1]), 36)
+        for location in cell_locations.values:
+            patch = cropPatch(img, (location[0], location[1]), N)
 
-    features = []
+            features = []
 
-    # Calculate the intensity-based features
-    intensity_feature_vector = calculateIntensityFeatures(patch, bin_number)
+            # Calculate the intensity-based features
+            intensity_feature_vector = calculateIntensityFeatures(patch, bin_number)
 
-    accM = calculateAccumulatedCooccurrenceMatrix(patch, bin_number, d)
+            accM = calculateAccumulatedCooccurrenceMatrix(patch, bin_number, d)
 
-    # Calculate the texture-based features
-    texture_feature_vector = calculateCooccurrenceFeatures(accM)
+            # Calculate the texture-based features
+            texture_feature_vector = calculateCooccurrenceFeatures(accM)
 
-    overall_feature_vector = np.concatenate((intensity_feature_vector, texture_feature_vector))
+            overall_feature_vector = np.concatenate((intensity_feature_vector, texture_feature_vector))
 
-    all_features = np.vstack((all_features, overall_feature_vector))
+            all_features = np.vstack((all_features, overall_feature_vector))
 
-# Normalize the feature vectors
-all_features = (all_features - all_features.min(axis=0)) / (all_features.max(axis=0) - all_features.min(axis=0))
+        # Normalize the feature vectors
+        all_features = (all_features - all_features.min(axis=0)) / (all_features.max(axis=0) - all_features.min(axis=0))
 
-# Weight the feature vectors
-all_features = weighted_clustering(all_features, cell_dict)
+        # Weight the feature vectors
+        all_features = weighted_clustering(all_features, cell_dict)
 
-# Specify the desired number of clusters for k-means
-num_clusters = 3
+        # Specify the desired number of clusters for k-means
 
-# Run k-means clustering
-kmeans = KMeans(n_clusters=num_clusters)
-kmeans.fit(all_features)
+        # Run k-means clustering
+        kmeans = KMeans(n_clusters=k, n_init=10)
+        kmeans.fit(all_features)
 
-# Get the cluster labels assigned to each cell
-cluster_labels = kmeans.labels_
+        # Get the cluster labels assigned to each cell
+        cluster_labels = kmeans.labels_
 
-# Get the cluster centers
-cluster_centers = kmeans.cluster_centers_
+        # Get the cluster centers
+        cluster_centers = kmeans.cluster_centers_
 
-# Get the number of cells in each cluster
-unique, counts = np.unique(cluster_labels, return_counts=True)
-cluster_sizes = dict(zip(unique, counts))
+        # Get the number of cells in each cluster
+        unique, counts = np.unique(cluster_labels, return_counts=True)
+        cluster_sizes = dict(zip(unique, counts))
 
-# Print the number of cells in each cluster
-print(cluster_sizes)
+        # Print the number of cells in each cluster
+        #print(cluster_sizes)
+        total_sum = sum(cluster_sizes)
+        cluster_ratios = [(num / total_sum) * 100 for num in cluster_sizes]
+
+        cluster_ratio_list.append(cluster_ratios)
+
+    return cluster_ratio_list
+
+
+bin_number_vals = [i for i in range(5, 20)]
+d_vals = [i for i in range(1, 20)]
+N_vals = [i for i in range(30, 40)]
+k_vals = [3, 5]
+
+test_nums = [1, 10]
+cell_dict_list = []
+for testNum in test_nums:
+    img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE) # read it in main func
+    cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
+    cell_dict = create_cell_dict(cell_locations)
+    cell_dict_list.append(cell_dict)
+
+print("Ground Truth: ", cell_dict_list)
+
+for permutation in itertools.product(bin_number_vals, d_vals, N_vals, k_vals):
+    print("Testing parameters: ", *permutation)
+    print(experiment(*permutation))
