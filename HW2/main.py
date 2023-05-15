@@ -143,8 +143,16 @@ def experiment(bin_number, d, N, k):
 
         # Print the ratios of cell types in each cluster
         print("Cluster\tinflammation\tepithelial\tspindle")
+        accuracy = 0
         for label, ratio in ratios.items():
+            max_ratio = max(ratio['inflammation'], ratio['epithelial'], ratio['spindle'])
+            accuracy+= max_ratio/len(ratios)
+
+
+
             print(f"{label}\t{ratio['inflammation']:.2f}\t\t{ratio['epithelial']:.2f}\t\t{ratio['spindle']:.2f}")
+
+        print('accuracy: ', accuracy)
         # Get the cluster centers
         cluster_centers = kmeans.cluster_centers_
 
@@ -166,9 +174,13 @@ def experiment(bin_number, d, N, k):
 
 
 bin_number_vals = [i for i in [5, 10, 15]]
+#bin_number_vals = [10]
 d_vals = [i for i in [1, 2, 3]]
-N_vals = [i for i in [42, 12, 36, 42]]
-k_vals = [3, 5]
+#d_vals = [3]
+N_vals = [i for i in [12, 36, 42]]
+#N_vals = [12]
+k_vals = [3,5]
+#k_vals = [3]
 
 test_nums = [1, 10]
 cell_dict_list = []
@@ -181,7 +193,6 @@ for testNum in test_nums:
 print("Ground Truth: ", cell_dict_list)
 
 for permutation in itertools.product(bin_number_vals, d_vals, N_vals, k_vals):
-    print("Testing parameters: ", *permutation)
+    print("Testing parameters (bin_number_vals, d_vals, N_vals, k_vals): ", *permutation)
     experiment(*permutation)
-    #print()
     print("--------------------------------------------------")
