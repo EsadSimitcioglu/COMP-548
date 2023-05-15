@@ -6,7 +6,6 @@ from sklearn.cluster import KMeans
 
 from intensity_based_features import calculateIntensityFeatures
 from textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
-from filter_based_features import calculateGaborFilter
 import itertools
 
 
@@ -82,16 +81,19 @@ def displayPatch(patch):
 
 
 def experiment(bin_number, d, N, k):
+
     cluster_ratio_list = []
     test_nums = [1, 10]
-    for testNum in test_nums:
+    for test_num in test_nums:
 
-        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)  # read it in main func
-        cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
+        img = cv2.imread('nucleus-dataset/test_{}.png'.format(test_num), cv2.IMREAD_GRAYSCALE) # read it in main func
+        cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(test_num), sep='\t', header=None)
 
         cell_dict = create_cell_dict(cell_locations)
 
-        all_features = np.array([]).reshape(0, 4)
+        all_features = np.array([]).reshape(0, 7)
+
+        cell_types = []
 
         for location in cell_locations.values:
             patch = cropPatch(img, (location[0], location[1]), N)
@@ -102,21 +104,20 @@ def experiment(bin_number, d, N, k):
             # Calculate the accumulated co-occurrence matrix
             accM = calculateAccumulatedCooccurrenceMatrix(patch, bin_number, d)
 
-            # Calcualte the filter-based features
-            filter_feature_vector = calculateGaborFilter(patch)
-
             # Calculate the texture-based features
             texture_feature_vector = calculateCooccurrenceFeatures(accM)
 
-            overall_feature_vector = np.concatenate((intensity_feature_vector, filter_feature_vector))
+            overall_feature_vector = np.concatenate((intensity_feature_vector, texture_feature_vector))
 
             all_features = np.vstack((all_features, overall_feature_vector))
-
+            cell_types.append(location[2])
         # Normalize the feature vectors
         all_features = (all_features - all_features.min(axis=0)) / (all_features.max(axis=0) - all_features.min(axis=0))
 
         # Weight the feature vectors
         all_features = weighted_clustering(all_features, cell_dict)
+
+        # Specify the desired number of clusters for k-means
 
         # Run k-means clustering
         kmeans = KMeans(n_clusters=k, n_init=10)
@@ -124,15 +125,37 @@ def experiment(bin_number, d, N, k):
 
         # Get the cluster labels assigned to each cell
         cluster_labels = kmeans.labels_
+        # Get the unique cluster labels
+        unique_labels = np.unique(cluster_labels)
+
+        # Create a dictionary to store the cell counts in each cluster
+        cell_counts = {label: {'inflammation': 0, 'epithelial': 0, 'spindle': 0} for label in unique_labels}
+
+        # Count the cell types in each cluster
+        for i, label in enumerate(cluster_labels):
+            cell_counts[label][cell_types[i]] += 1
+
+        # Calculate the ratios of cell types in each cluster
+        ratios = {}
+        for label, counts in cell_counts.items():
+            total_cells = sum(counts.values())
+            ratios[label] = {cell_type: count / total_cells for cell_type, count in counts.items()}
+
+        # Print the ratios of cell types in each cluster
+        print("Cluster\tinflammation\tepithelial\tspindle")
+        for label, ratio in ratios.items():
+            print(f"{label}\t{ratio['inflammation']:.2f}\t\t{ratio['epithelial']:.2f}\t\t{ratio['spindle']:.2f}")
+        # Get the cluster centers
+        cluster_centers = kmeans.cluster_centers_
 
         # Get the number of cells in each cluster
         unique, counts = np.unique(cluster_labels, return_counts=True)
         cluster_sizes = dict(zip(unique, counts))
 
         # Print the number of cells in each cluster
-        # print(cluster_sizes)
+        print(cluster_sizes)
 
-        color_cluster(cell_locations, img, cluster_labels)
+        #color_cluster(cell_locations, img, cluster_labels)
 
         total_sum = sum(cluster_sizes)
         cluster_ratios = [(num / total_sum) * 100 for num in cluster_sizes]
@@ -142,15 +165,15 @@ def experiment(bin_number, d, N, k):
     return cluster_ratio_list
 
 
-bin_number_vals = [i for i in range(5, 20)]
-d_vals = [i for i in range(1, 20)]
-N_vals = [i for i in range(30, 40)]
+bin_number_vals = [i for i in [5, 10, 15]]
+d_vals = [i for i in [1, 2, 3]]
+N_vals = [i for i in [42, 12, 36, 42]]
 k_vals = [3, 5]
 
 test_nums = [1, 10]
 cell_dict_list = []
 for testNum in test_nums:
-    img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE) # read it in main func
     cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
     cell_dict = create_cell_dict(cell_locations)
     cell_dict_list.append(cell_dict)
@@ -159,5 +182,6 @@ print("Ground Truth: ", cell_dict_list)
 
 for permutation in itertools.product(bin_number_vals, d_vals, N_vals, k_vals):
     print("Testing parameters: ", *permutation)
-    print(experiment(*permutation))
+    experiment(*permutation)
+    #print()
     print("--------------------------------------------------")
