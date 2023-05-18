@@ -1,28 +1,39 @@
-import numpy as np
 import cv2
-from skimage.filters import gabor_kernel
+import numpy as np
 
 
-def calculateGaborFilter(patch):
+def create_gaborfilter():
+    # This function is designed to produce a set of GaborFilters
+    # an even distribution of theta values equally distributed amongst pi rad / 180 degree
 
-    # Initialize the feature vector
-    feature_vector = []
+    filters = []
+    num_filters = 16
+    ksize = 35  # The local area to evaluate
+    sigma = 3.0  # Larger Values produce more edges
+    lambd = 10.0
+    gamma = 0.5
+    psi = 0  # Offset value - lower generates cleaner results
+    for theta in np.arange(0, np.pi, np.pi / num_filters):  # Theta is the orientation for edge detection
+        kern = cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_64F)
+        kern /= 1.0 * kern.sum()  # Brightness normalization
+        filters.append(kern)
+    return filters
 
-    # Define Gabor filter parameters
-    frequency = 0.6
-    theta = 0.8
-    sigma = 5
 
-    # Create the Gabor kernel
-    kernel = np.real(gabor_kernel(frequency, theta=theta, sigma_x=sigma))
+def apply_filter(img, filters):
+    # This general function is designed to apply filters to our image
 
-    # Apply the Gabor kernel to the patch
-    filtered_patch = np.abs(cv2.filter2D(patch, cv2.CV_64F, kernel))
+    # First create a numpy array the same size as our input image
+    newimage = np.zeros_like(img)
 
-    # Calculate the average magnitude of Gabor responses for the patch
-    feature = np.mean(filtered_patch)
+    # Starting with a blank image, we loop through the images and apply our Gabor Filter
+    # On each iteration, we take the highest value (super impose), until we have the max value across all filters
+    # The final image is returned
+    depth = -1  # remain depth same as original image
 
-    # Append the feature to the feature vector
-    feature_vector.append(feature)
+    for kern in filters:  # Loop through the kernels in our GaborFilter
+        image_filter = cv2.filter2D(img, depth, kern)  # Apply filter to image
 
-    return np.array(feature_vector)
+        # Using Numpy.maximum to compare our filter and cumulative image, taking the higher value (max)
+        np.maximum(newimage, image_filter, newimage)
+    return newimage

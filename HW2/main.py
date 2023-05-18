@@ -4,6 +4,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
+from HW2.filter_based_features import create_gaborfilter, apply_filter
 from intensity_based_features import calculateIntensityFeatures
 from textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
 import itertools
@@ -81,12 +82,11 @@ def displayPatch(patch):
 
 
 def experiment(bin_number, d, N, k):
-
     cluster_ratio_list = []
     test_nums = [1, 10]
     for test_num in test_nums:
 
-        img = cv2.imread('nucleus-dataset/test_{}.png'.format(test_num), cv2.IMREAD_GRAYSCALE) # read it in main func
+        img = cv2.imread('nucleus-dataset/test_{}.png'.format(test_num), cv2.IMREAD_GRAYSCALE)  # read it in main func
         cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(test_num), sep='\t', header=None)
 
         cell_dict = create_cell_dict(cell_locations)
@@ -146,9 +146,7 @@ def experiment(bin_number, d, N, k):
         accuracy = 0
         for label, ratio in ratios.items():
             max_ratio = max(ratio['inflammation'], ratio['epithelial'], ratio['spindle'])
-            accuracy+= max_ratio/len(ratios)
-
-
+            accuracy += max_ratio / len(ratios)
 
             print(f"{label}\t{ratio['inflammation']:.2f}\t\t{ratio['epithelial']:.2f}\t\t{ratio['spindle']:.2f}")
 
@@ -163,7 +161,7 @@ def experiment(bin_number, d, N, k):
         # Print the number of cells in each cluster
         print(cluster_sizes)
 
-        #color_cluster(cell_locations, img, cluster_labels)
+        color_cluster(cell_locations, img, cluster_labels)
 
         total_sum = sum(cluster_sizes)
         cluster_ratios = [(num / total_sum) * 100 for num in cluster_sizes]
@@ -173,19 +171,27 @@ def experiment(bin_number, d, N, k):
     return cluster_ratio_list
 
 
+is_filter_apply = True
+
 bin_number_vals = [i for i in [5, 10, 15]]
-#bin_number_vals = [10]
+# bin_number_vals = [10]
 d_vals = [i for i in [1, 2, 3]]
-#d_vals = [3]
+# d_vals = [3]
 N_vals = [i for i in [12, 36, 42]]
-#N_vals = [12]
-k_vals = [3,5]
-#k_vals = [3]
+# N_vals = [12]
+k_vals = [3, 5]
+# k_vals = [3]
 
 test_nums = [1, 10]
 cell_dict_list = []
 for testNum in test_nums:
-    img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE) # read it in main func
+    if is_filter_apply:
+        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)  # read it in main func
+        gfilters = create_gaborfilter()
+        img = apply_filter(img, gfilters)
+    else:
+        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)  # read it in main func
+
     cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
     cell_dict = create_cell_dict(cell_locations)
     cell_dict_list.append(cell_dict)
