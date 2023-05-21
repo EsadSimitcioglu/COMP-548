@@ -3,11 +3,27 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
+from pathlib import Path
 
-from HW2.filter_based_features import create_gaborfilter, apply_filter
+from HW2.filter_based_features import create_gabor_filters, apply_filters
 from intensity_based_features import calculateIntensityFeatures
 from textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
 import itertools
+
+train_cell_ids = [1, 10, 8, 11, 14, 21]
+
+is_filter_apply = False
+
+bin_number_vals = [i for i in [10, 30]]
+# bin_number_vals = [10]
+d_vals = [i for i in [1]]
+# d_vals = [3]
+N_vals = [i for i in [18, 36]]
+# N_vals = [12]
+k_vals = [3, 5]
+# k_vals = [5]
+
+accuracy_average_list = []
 
 
 def color_cluster(cell_locations, img, cluster_labels):
@@ -83,14 +99,36 @@ def displayPatch(patch):
 
 def experiment(bin_number, d, N, k):
     cluster_ratio_list = []
-    test_nums = [1, 10]
-    for test_num in test_nums:
 
-        img = cv2.imread('nucleus-dataset/test_{}.png'.format(test_num), cv2.IMREAD_GRAYSCALE)  # read it in main func
-        cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(test_num), sep='\t', header=None)
+    accuracy_average = 0
+
+    for train_image_id in train_cell_ids:
+        test_path = Path('nucleus-dataset/test_{}.png'.format(train_image_id))
+        train_path = Path('nucleus-dataset/train_{}.png'.format(train_image_id))
+
+        path_exist = None
+
+        if test_path.is_file():
+            path_exist = test_path.as_posix()
+        else:
+            path_exist = train_path.as_posix()
+
+        if is_filter_apply:
+            img = cv2.imread(path_exist,
+                             cv2.IMREAD_GRAYSCALE)
+            gfilters = create_gabor_filters()
+            img = apply_filters(img, gfilters)
+        else:
+            img = cv2.imread(path_exist, cv2.IMREAD_GRAYSCALE)
+
+        path = Path('nucleus-dataset/test_{}_cells'.format(train_image_id))
+
+        if path.is_file():
+            cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(train_image_id), sep='\t', header=None)
+        else:
+            cell_locations = pd.read_csv('nucleus-dataset/train_{}_cells'.format(train_image_id), sep='\t', header=None)
 
         cell_dict = create_cell_dict(cell_locations)
-
         all_features = np.array([]).reshape(0, 7)
 
         cell_types = []
@@ -111,13 +149,12 @@ def experiment(bin_number, d, N, k):
 
             all_features = np.vstack((all_features, overall_feature_vector))
             cell_types.append(location[2])
+
         # Normalize the feature vectors
         all_features = (all_features - all_features.min(axis=0)) / (all_features.max(axis=0) - all_features.min(axis=0))
 
         # Weight the feature vectors
         all_features = weighted_clustering(all_features, cell_dict)
-
-        # Specify the desired number of clusters for k-means
 
         # Run k-means clustering
         kmeans = KMeans(n_clusters=k, n_init=10)
@@ -125,6 +162,7 @@ def experiment(bin_number, d, N, k):
 
         # Get the cluster labels assigned to each cell
         cluster_labels = kmeans.labels_
+
         # Get the unique cluster labels
         unique_labels = np.unique(cluster_labels)
 
@@ -151,15 +189,15 @@ def experiment(bin_number, d, N, k):
             print(f"{label}\t{ratio['inflammation']:.2f}\t\t{ratio['epithelial']:.2f}\t\t{ratio['spindle']:.2f}")
 
         print('accuracy: ', accuracy)
+
+        accuracy_average += accuracy
+
         # Get the cluster centers
         cluster_centers = kmeans.cluster_centers_
 
         # Get the number of cells in each cluster
         unique, counts = np.unique(cluster_labels, return_counts=True)
         cluster_sizes = dict(zip(unique, counts))
-
-        # Print the number of cells in each cluster
-        print(cluster_sizes)
 
         color_cluster(cell_locations, img, cluster_labels)
 
@@ -168,31 +206,19 @@ def experiment(bin_number, d, N, k):
 
         cluster_ratio_list.append(cluster_ratios)
 
+    accuracy_average_list.append(accuracy_average / len(train_cell_ids))
     return cluster_ratio_list
 
 
-is_filter_apply = True
-
-bin_number_vals = [i for i in [5, 10, 15]]
-# bin_number_vals = [10]
-d_vals = [i for i in [1, 2, 3]]
-# d_vals = [3]
-N_vals = [i for i in [12, 36, 42]]
-# N_vals = [12]
-k_vals = [3, 5]
-# k_vals = [3]
-
-test_nums = [1, 10]
 cell_dict_list = []
-for testNum in test_nums:
-    if is_filter_apply:
-        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)  # read it in main func
-        gfilters = create_gaborfilter()
-        img = apply_filter(img, gfilters)
-    else:
-        img = cv2.imread('nucleus-dataset/test_{}.png'.format(testNum), cv2.IMREAD_GRAYSCALE)  # read it in main func
+for train_cell_id in train_cell_ids:
+    path = Path('nucleus-dataset/test_{}_cells'.format(train_cell_id))
 
-    cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(testNum), sep='\t', header=None)
+    if path.is_file():
+        cell_locations = pd.read_csv('nucleus-dataset/test_{}_cells'.format(train_cell_id), sep='\t', header=None)
+    else:
+        cell_locations = pd.read_csv('nucleus-dataset/train_{}_cells'.format(train_cell_id), sep='\t', header=None)
+
     cell_dict = create_cell_dict(cell_locations)
     cell_dict_list.append(cell_dict)
 
@@ -202,3 +228,6 @@ for permutation in itertools.product(bin_number_vals, d_vals, N_vals, k_vals):
     print("Testing parameters (bin_number_vals, d_vals, N_vals, k_vals): ", *permutation)
     experiment(*permutation)
     print("--------------------------------------------------")
+
+average_accuracy = sum(accuracy_average_list) / len(accuracy_average_list)
+print("accuracy_average_list: ", average_accuracy)
