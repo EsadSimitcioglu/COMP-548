@@ -5,23 +5,23 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 from pathlib import Path
 
-from HW2.filter_based_features import create_gabor_filters, apply_filters
+from HW2.filter_based_features import create_gabor_filters, apply_filters, feature_extraction
 from intensity_based_features import calculateIntensityFeatures
 from textural_based_features import calculateCooccurrenceFeatures, calculateAccumulatedCooccurrenceMatrix
 import itertools
 
 train_cell_ids = [1, 10, 8, 11, 14, 21]
 
-is_filter_apply = False
+is_filter_apply = True
 
-bin_number_vals = [i for i in [10, 30]]
-# bin_number_vals = [10]
-d_vals = [i for i in [1]]
-# d_vals = [3]
-N_vals = [i for i in [18, 36]]
-# N_vals = [12]
-k_vals = [3, 5]
-# k_vals = [5]
+# bin_number_vals = [i for i in [10, 30]]
+bin_number_vals = [10]
+# d_vals = [i for i in [1]]
+d_vals = [3]
+# N_vals = [i for i in [18, 36]]
+N_vals = [12]
+# k_vals = [3, 5]
+k_vals = [5]
 
 accuracy_average_list = []
 
@@ -144,6 +144,9 @@ def experiment(bin_number, d, N, k):
 
             # Calculate the texture-based features
             texture_feature_vector = calculateCooccurrenceFeatures(accM)
+
+            # Calculate the filter-based features
+            # filter_feature_vector = feature_extraction(patch)
 
             overall_feature_vector = np.concatenate((intensity_feature_vector, texture_feature_vector))
 

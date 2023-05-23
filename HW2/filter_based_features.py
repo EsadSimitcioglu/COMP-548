@@ -17,3 +17,13 @@ def apply_filters(img, filters):
         image_filter = cv2.filter2D(img, -1, kern)
         np.maximum(new_image, image_filter, new_image)
     return new_image
+
+def feature_extraction(filtered_img):
+    features = []
+    # Compute statistical features
+    mean = np.mean(filtered_img)
+    std = np.std(filtered_img)
+    energy = np.sum(filtered_img ** 2)
+    features.extend([mean, std, energy])
+
+    return np.array(features)
