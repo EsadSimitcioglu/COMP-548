@@ -84,6 +84,20 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs):
     return model
 
 
+def make_weights_for_balanced_classes(images, nclasses):
+    count = [0] * nclasses
+    for item in images:
+        count[item[1]] += 1
+    weight_per_class = [0.] * nclasses
+    N = float(sum(count))
+    for i in range(nclasses):
+        weight_per_class[i] = N / float(count[i])
+    weight = [0] * len(images)
+    for idx, val in enumerate(images):
+        weight[idx] = weight_per_class[val[1]]
+    return weight
+
+
 data_dir = 'dataset'
 
 data_transforms = {
@@ -105,9 +119,20 @@ image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x]) for x in ['train', 'valid', 'test']
                   }
 
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x],
-                                              batch_size=4, shuffle=True)
-               for x in ['train', 'valid', 'test']}
+weights = {x: make_weights_for_balanced_classes(image_datasets[x], 3) for x in ['train', 'valid', 'test']}
+
+# sampler part handles the class imbalance, shuffle = True
+sampler = {x: torch.utils.data.sampler.WeightedRandomSampler(weights[x], len(weights[x])) for x in
+           ['train', 'valid', 'test']}
+
+dataloaders = {
+    x: torch.utils.data.DataLoader(
+        image_datasets[x],
+        batch_size=4,
+        shuffle=True,
+    )
+    for x in ['train', 'valid', 'test']
+}
 
 if __name__ == '__main__':
 
@@ -137,3 +162,35 @@ if __name__ == '__main__':
 
     model_conv = train_model(model_conv, criterion, optimizer_conv,
                              exp_lr_scheduler, num_epochs=25)
+
+    # Save the model
+
+    # Create accuracy matrix
+    with torch.no_grad():
+        for type in ['train', 'valid', 'test']:
+            confusion_matrix = torch.zeros(3, 3)
+            for i, (inputs, classes) in enumerate(dataloaders[type]):
+                inputs = inputs.to(device)
+                classes = classes.to(device)
+                outputs = model_conv(inputs)
+                _, preds = torch.max(outputs, 1)
+                for t, p in zip(classes.view(-1), preds.view(-1)):
+                    confusion_matrix[t.long(), p.long()] += 1
+
+            print(confusion_matrix)
+            print(
+                confusion_matrix.diag() / (confusion_matrix.sum(0) + confusion_matrix.sum(1) - confusion_matrix.diag()))
+            print(confusion_matrix.diag().sum() / confusion_matrix.sum())
+
+# Results
+
+# Before Class Imbalance
+# 0.9840 -> train
+# 0.8361 -> valid
+# 0.9028 -> test
+
+
+# After Class Imbalance
+# 0.9680 -> train
+# 0.8361 -> valid
+# 0.9583 -> test
