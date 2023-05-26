@@ -5,11 +5,14 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 import numpy as np
 import torchvision
+import torch
+from torch.utils.data import WeightedRandomSampler, DataLoader
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 import time
 import os
 import copy
+from collections import defaultdict
 
 from torchvision.datasets import ImageFolder
 
@@ -91,7 +94,7 @@ def make_weights_for_balanced_classes(images, nclasses):
     weight_per_class = [0.] * nclasses
     N = float(sum(count))
     for i in range(nclasses):
-        weight_per_class[i] = N / float(count[i])
+        weight_per_class[i] = N/float(count[i])
     weight = [0] * len(images)
     for idx, val in enumerate(images):
         weight[idx] = weight_per_class[val[1]]
@@ -100,39 +103,41 @@ def make_weights_for_balanced_classes(images, nclasses):
 
 data_dir = 'dataset'
 
+image_size = 224
+
 data_transforms = {
     'train': transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Resize((image_size, image_size)),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ]),
     'valid': transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Resize((image_size, image_size)),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ]),
     'test': transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Resize((image_size, image_size)),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 }
 
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
-                                          data_transforms[x]) for x in ['train', 'valid', 'test']
-                  }
+image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'valid', 'test']}
 
-weights = {x: make_weights_for_balanced_classes(image_datasets[x], 3) for x in ['train', 'valid', 'test']}
-
-# sampler part handles the class imbalance, shuffle = True
-sampler = {x: torch.utils.data.sampler.WeightedRandomSampler(weights[x], len(weights[x])) for x in
-           ['train', 'valid', 'test']}
+# Calculate weights only for the training set
+train_weights = make_weights_for_balanced_classes(image_datasets['train'], 3)
 
 dataloaders = {
-    x: torch.utils.data.DataLoader(
-        image_datasets[x],
+    'train': DataLoader(
+        image_datasets['train'],
         batch_size=4,
-        shuffle=True,
-    )
-    for x in ['train', 'valid', 'test']
+        sampler=WeightedRandomSampler(train_weights, len(train_weights), replacement=True)
+    ),
+    'valid': DataLoader(image_datasets['valid'], batch_size=4, shuffle=True),
+    'test': DataLoader(image_datasets['test'], batch_size=4, shuffle=True)
 }
+
 
 if __name__ == '__main__':
 
@@ -181,16 +186,3 @@ if __name__ == '__main__':
             print(
                 confusion_matrix.diag() / (confusion_matrix.sum(0) + confusion_matrix.sum(1) - confusion_matrix.diag()))
             print(confusion_matrix.diag().sum() / confusion_matrix.sum())
-
-# Results
-
-# Before Class Imbalance
-# 0.9840 -> train
-# 0.8361 -> valid
-# 0.9028 -> test
-
-
-# After Class Imbalance
-# 0.9680 -> train
-# 0.8361 -> valid
-# 0.9583 -> test
