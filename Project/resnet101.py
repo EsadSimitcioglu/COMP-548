@@ -15,6 +15,18 @@ import copy
 from collections import defaultdict
 
 from torchvision.datasets import ImageFolder
+import warnings
+
+warnings.filterwarnings("ignore")
+
+class WeightedCrossEntropyLoss(nn.Module):
+    def __init__(self, weight=None):
+        super(WeightedCrossEntropyLoss, self).__init__()
+        self.weight = weight
+
+    def forward(self, inputs, targets):
+        loss = nn.CrossEntropyLoss(weight=self.weight.to(targets.device))
+        return loss(inputs, targets)
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs):
@@ -100,7 +112,7 @@ def make_weights_for_balanced_classes(images, nclasses):
     return weights
 
 
-data_dir = 'main_dir'
+data_dir = 'dataset4'
 
 image_size = 224
 
@@ -122,15 +134,14 @@ data_transforms = {
     ])
 }
 
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'valid', 'test']}
-
+image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in
+                  ['train', 'valid', 'test']}
 
 dataloaders = {
-    'train': DataLoader(image_datasets['valid'], batch_size=4, shuffle=True),
-    'valid': DataLoader(image_datasets['valid'], batch_size=4, shuffle=True),
-    'test': DataLoader(image_datasets['test'], batch_size=4, shuffle=True)
+    'train': DataLoader(image_datasets['valid'], batch_size=16, shuffle=True),
+    'valid': DataLoader(image_datasets['valid'], batch_size=16, shuffle=True),
+    'test': DataLoader(image_datasets['test'], batch_size=16, shuffle=True)
 }
-
 
 if __name__ == '__main__':
 
@@ -138,35 +149,38 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Download the pretrained AlexNet model
-    model_conv = models.alexnet(pretrained=True)
+    model_conv = models.resnet101(pretrained=True)
 
     # Freeze the parameters
     for param in model_conv.parameters():
         param.requires_grad = False
 
-    # print(model_conv)
-
     # Last layer of the AlexNet is Linear(in_features=4096, out_features=1000, bias=True)
     # We need to change the last layer to have 3 classes instead of 1000
-    num_ftrs = model_conv.classifier[6].in_features
-    model_conv.classifier[6] = nn.Linear(num_ftrs, 2)
+    num_ftrs = model_conv.fc.in_features
+    model_conv.fc = nn.Linear(num_ftrs, 4)
     model_conv = model_conv.to(device)
 
-    # Define the loss function
-    criterion = nn.CrossEntropyLoss()
+    class_counts = [2531, 7134, 941, 4208]  # Assuming counts of the two classes
+    summed = sum(class_counts)
+    weights = torch.tensor(class_counts, dtype=torch.float32) / summed
+    criterion = WeightedCrossEntropyLoss(weight=weights)
 
-    optimizer_conv = optim.SGD(model_conv.classifier[6].parameters(), lr=0.001, momentum=0.9)
+    #criterion = nn.CrossEntropyLoss()
+
+    optimizer_conv = optim.SGD(model_conv.fc.parameters(), lr=0.001, momentum=0.9)
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
 
     model_conv = train_model(model_conv, criterion, optimizer_conv,
                              exp_lr_scheduler, num_epochs=25)
 
-    # Save the model
+    y_true = []
+    y_pred = []
 
     # Create accuracy matrix
     with torch.no_grad():
         for type in ['train', 'valid', 'test']:
-            confusion_matrix = torch.zeros(2, 2)
+            confusion_matrix = torch.zeros(4, 4)
             for i, (inputs, classes) in enumerate(dataloaders[type]):
                 inputs = inputs.to(device)
                 classes = classes.to(device)
@@ -174,8 +188,35 @@ if __name__ == '__main__':
                 _, preds = torch.max(outputs, 1)
                 for t, p in zip(classes.view(-1), preds.view(-1)):
                     confusion_matrix[t.long(), p.long()] += 1
+                    y_true.append(t.long())
+                    y_pred.append(p.long())
 
             print(confusion_matrix)
             print(
                 confusion_matrix.diag() / (confusion_matrix.sum(0) + confusion_matrix.sum(1) - confusion_matrix.diag()))
             print(confusion_matrix.diag().sum() / confusion_matrix.sum())
+
+    # Find accuracy recall precision f1 score
+    with torch.no_grad():
+        confusion_matrix = torch.zeros(4, 4)
+        for i, (inputs, classes) in enumerate(dataloaders['test']):
+            inputs = inputs.to(device)
+            classes = classes.to(device)
+            outputs = model_conv(inputs)
+            _, preds = torch.max(outputs, 1)
+            for t, p in zip(classes.view(-1), preds.view(-1)):
+                confusion_matrix[t.long(), p.long()] += 1
+
+        # accuracy
+        acc = confusion_matrix.diag().sum() / confusion_matrix.sum()
+        # recall
+        recall = confusion_matrix.diag() / (confusion_matrix.sum(1))
+        # precision
+        precision = confusion_matrix.diag() / (confusion_matrix.sum(0))
+        # f1 score
+        f1 = 2 * precision * recall / (precision + recall)
+
+        print("Accuracy: ", acc)
+        print("Recall: ", recall)
+        print("Precision: ", precision)
+        print("F1 Score: ", f1)
